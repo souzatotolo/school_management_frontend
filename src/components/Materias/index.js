@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import UpdateModal from '../UpdateModal';
+import ConfirmModal from '../ConfirmModal/ConfirmModal';
 
 export default function Materias() {
   const [materias, setMaterias] = useState([]);
-  const [form, setForm] = useState({
-    codigo: '',
-    nome: '',
-  });
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [currentMateria, setCurrentMateria] = useState(null); // Matéria para exclusão ou edição
+  const [form, setForm] = useState({ codigo: '', nome: '' });
 
   useEffect(() => {
     loadMaterias();
@@ -17,28 +19,72 @@ export default function Materias() {
     setMaterias(response.data);
   };
 
-  const handleChange = (e) =>
-    setForm({ ...form, [e.target.name]: e.target.value });
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setForm({ ...form, [name]: value });
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    await axios.post('http://localhost:3333/materias', form);
-    loadMaterias();
+    try {
+      if (currentMateria) {
+        await axios.put(
+          `http://localhost:3333/materias/update/${currentMateria.id}`,
+          form
+        );
+      } else {
+        await axios.post('http://localhost:3333/materias', form);
+      }
+      loadMaterias();
+      closeModal();
+    } catch (error) {
+      console.error('Erro ao salvar matéria:', error);
+    }
   };
 
-  const excluirMateria = async (id) => {
-    await axios.put(`http://localhost:3333/materias/${id}`, { exclusao: true });
-    loadMaterias();
+  const openModal = (materia = null) => {
+    setIsModalOpen(true);
+    if (materia) {
+      setCurrentMateria(materia);
+      setForm(materia);
+    } else {
+      setCurrentMateria(null);
+      setForm({ codigo: '', nome: '' });
+    }
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setCurrentMateria(null);
+  };
+
+  const openConfirm = (materia) => {
+    console.log('Abrindo modal de confirmação:', materia);
+    setCurrentMateria(materia);
+    setIsConfirmOpen(true);
+  };
+
+  const closeConfirm = () => {
+    setIsConfirmOpen(false);
+    setCurrentMateria(null);
+  };
+
+  const excluirMateria = async () => {
+    try {
+      await axios.put(`http://localhost:3333/materias/${currentMateria.id}`, {
+        exclusao: true,
+      });
+      loadMaterias();
+      closeConfirm();
+    } catch (error) {
+      console.error('Erro ao excluir matéria:', error);
+    }
   };
 
   return (
     <div>
       <h1>Matérias</h1>
-      <form onSubmit={handleSubmit}>
-        <input name="codigo" placeholder="Código" onChange={handleChange} />
-        <input name="nome" placeholder="Nome" onChange={handleChange} />
-        <button type="submit">Adicionar</button>
-      </form>
+      <button onClick={() => openModal()}>Adicionar Matéria</button>
 
       <table>
         <thead>
@@ -54,10 +100,8 @@ export default function Materias() {
               <td>{materia.codigo}</td>
               <td>{materia.nome}</td>
               <td>
-                <button
-                  className="delete"
-                  onClick={() => excluirMateria(materia.id)}
-                >
+                <button onClick={() => openModal(materia)}>Editar</button>
+                <button className="delete" onClick={() => openConfirm(materia)}>
                   Excluir
                 </button>
               </td>
@@ -65,6 +109,23 @@ export default function Materias() {
           ))}
         </tbody>
       </table>
+
+      <UpdateModal
+        isOpen={isModalOpen}
+        onClose={closeModal}
+        formData={form}
+        onChange={handleChange}
+        onSubmit={handleSubmit}
+        title={currentMateria ? 'Editar Matéria' : 'Adicionar Matéria'}
+        editableFields={['codigo', 'nome']}
+      />
+
+      <ConfirmModal
+        isOpen={isConfirmOpen}
+        onClose={closeConfirm}
+        onConfirm={excluirMateria}
+        message="Você deseja realmente excluir essa matéria?"
+      />
     </div>
   );
 }

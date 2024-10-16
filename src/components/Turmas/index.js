@@ -1,8 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import UpdateModal from '../UpdateModal';
+import ConfirmModal from '../ConfirmModal/ConfirmModal'; // Importando o modal de confirmação
 
 export default function Turmas() {
   const [turmas, setTurmas] = useState([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [currentTurma, setCurrentTurma] = useState(null); // Turma selecionada para edição ou exclusão
   const [form, setForm] = useState({
     codigo: '',
     nome: '',
@@ -23,61 +28,83 @@ export default function Turmas() {
     setTurmas(response.data);
   };
 
-  const handleChange = (e) =>
-    setForm({ ...form, [e.target.name]: e.target.value });
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setForm({ ...form, [name]: value });
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    await axios.post('http://localhost:3333/turmas', form);
+    if (currentTurma) {
+      await axios.put(
+        `http://localhost:3333/turmas/update/${currentTurma.id}`,
+        form
+      );
+    } else {
+      await axios.post('http://localhost:3333/turmas', form);
+    }
     loadTurmas();
+    closeModal();
   };
 
-  const excluirTurma = async (id) => {
-    await axios.put(`http://localhost:3333/turmas/${id}`, { exclusao: true });
+  const openModal = (turma = null) => {
+    setIsModalOpen(true);
+    if (turma) {
+      setCurrentTurma(turma);
+      setForm(turma);
+    } else {
+      setCurrentTurma(null);
+      setForm({
+        codigo: '',
+        nome: '',
+        serie: '',
+        periodo: '',
+        dia_semana: '',
+        qtd_alunos: '',
+        materia_id: '',
+        sala_id: '',
+      });
+    }
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setCurrentTurma(null);
+  };
+
+  const openConfirm = (turma) => {
+    setCurrentTurma(turma);
+    setIsConfirmOpen(true);
+  };
+
+  const closeConfirm = () => {
+    setIsConfirmOpen(false);
+    setCurrentTurma(null);
+  };
+
+  const excluirTurma = async () => {
+    await axios.put(`http://localhost:3333/turmas/${currentTurma.id}`, {
+      exclusao: true,
+    });
     loadTurmas();
+    closeConfirm();
   };
 
   return (
     <div>
       <h1>Turmas</h1>
-      <form onSubmit={handleSubmit}>
-        <input name="codigo" placeholder="Código" onChange={handleChange} />
-        <input name="nome" placeholder="Nome" onChange={handleChange} />
-        <input name="serie" placeholder="Série" onChange={handleChange} />
-        <input name="periodo" placeholder="Período" onChange={handleChange} />
-        <input
-          name="dia_semana"
-          placeholder="Dia da Semana"
-          onChange={handleChange}
-        />
-        <input
-          name="qtd_alunos"
-          placeholder="Qtd de Alunos"
-          onChange={handleChange}
-        />
-        <input
-          name="materia_id"
-          placeholder="ID da Matéria"
-          onChange={handleChange}
-        />
-        <input
-          name="sala_id"
-          placeholder="ID da Sala"
-          onChange={handleChange}
-        />
-        <button type="submit">Adicionar</button>
-      </form>
+      <button onClick={() => openModal()}>Adicionar Turma</button>
 
       <table>
         <thead>
           <tr>
-            <th>Código da Turma</th>
-            <th>Nome da Turma</th>
-            <th>Série/ Ano</th>
-            <th>Periodo</th>
+            <th>Código</th>
+            <th>Nome</th>
+            <th>Série/Ano</th>
+            <th>Período</th>
             <th>Dia da Semana</th>
             <th>Quantidade de Alunos</th>
-            <th>Materia</th>
+            <th>Matéria</th>
             <th>Sala</th>
             <th>Ações</th>
           </tr>
@@ -94,10 +121,8 @@ export default function Turmas() {
               <td>{turma.materia_id}</td>
               <td>{turma.sala_id}</td>
               <td>
-                <button
-                  className="delete"
-                  onClick={() => excluirTurma(turma.id)}
-                >
+                <button onClick={() => openModal(turma)}>Editar</button>
+                <button className="delete" onClick={() => openConfirm(turma)}>
                   Excluir
                 </button>
               </td>
@@ -105,6 +130,32 @@ export default function Turmas() {
           ))}
         </tbody>
       </table>
+
+      <UpdateModal
+        isOpen={isModalOpen}
+        onClose={closeModal}
+        formData={form}
+        onChange={handleChange}
+        onSubmit={handleSubmit}
+        title={currentTurma ? 'Editar Turma' : 'Adicionar Turma'}
+        editableFields={[
+          'codigo',
+          'nome',
+          'serie',
+          'periodo',
+          'dia_semana',
+          'qtd_alunos',
+          'materia_id',
+          'sala_id',
+        ]}
+      />
+
+      <ConfirmModal
+        isOpen={isConfirmOpen}
+        onClose={closeConfirm}
+        onConfirm={excluirTurma}
+        message="Você deseja realmente excluir esta turma?"
+      />
     </div>
   );
 }
